@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "reebpy"
+version = "0.1.0"
+description = "Python libary for building Reeb graphs from sequence data"
+authors = ["Vision Research Lab, UCSB"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^2.1.2"
+networkx = "^3.4.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+pandas = "^2.2.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
