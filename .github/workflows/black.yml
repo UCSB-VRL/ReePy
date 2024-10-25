@@ -1,0 +1,16 @@
+name: Black Code Formatter
+
+on:
+  pull_request:
+    branches: [dev]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - name: Install Black
+        run: pip install black
+      - name: Run Black
+        run: black --check .
