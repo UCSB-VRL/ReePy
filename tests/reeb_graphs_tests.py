@@ -13,5 +13,5 @@ def test_reeb_graph_init():
 def test_reeb_graph_nodes():
     data = np.array([[1, 1, 2, 2, 2, 2, 2, 2, 2, 2], [2, 2, 2, 2, 2, 1, 1, 1, 1, 1]])
     reeb_graph = ReebGraph(data)
-    #assert reeb_graph.nodes() == [1, 2]
+    # assert reeb_graph.nodes() == [1, 2]
     pass
