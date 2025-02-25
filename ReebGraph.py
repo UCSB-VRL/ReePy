@@ -41,3 +41,13 @@ class SequentialReebGraph(DiGraph):
             
         self.trajectories = np.vstack((self.trajectories, traj.reshape(1, -1)))
     
+    def _add_nodes_from_matrix(self, matrix):
+        for row in matrix:
+            self.add_node(tuple(row))
+
+    def build_graph(self):
+        # start by adding all the bundles at the start of the graph
+        active_nodes = np.hstack((np.zeros((self.bundle_centers[0].shape[0], 1)), self.bundle_centers[0]))
+        active_bundles = self.bundle_trajectories[0] 
+
+        self._add_nodes_from_matrix(active_nodes)
