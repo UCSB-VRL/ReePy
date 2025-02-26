@@ -54,3 +54,7 @@ curl -sSL https://install.python-poetry.org | python3
    ```
 
    This will allow you to run commands within the context of the virtual environment.
+
+## Usage
+
+### ReebGraph
