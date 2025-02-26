@@ -40,7 +40,7 @@ class SequentialReebGraph(DiGraph):
         
         for t in range(traj.shape[0]):
             # find the bundle distances
-            bundle_norms = self.dist(self.bundle_centers[t], traj[t].reshape(1, -1), axis=1)
+            bundle_norms = self.dist(self.bundle_centers[t], traj[t], axis=1)
 
             traj_bundle = np.argmin(bundle_norms)
 
