@@ -7,9 +7,13 @@ Sequential Reeb Graph - assumes no explicit time dimension (fixed sampling rate)
 TODO: generalize axis beyond default (0)
 """
 class SequentialReebGraph(DiGraph):
-    def __init__(self, norm=np.linalg.norm, epsilon=0.3):
+    @staticmethod
+    def euclidean_distance(x, y, axis=0):
+        return np.linalg.norm(x - y, axis=axis)
+
+    def __init__(self, dist=euclidean_distance, epsilon=0.3):
         super().__init__()
-        self.norm = norm
+        self.dist = dist
         self.epsilon = epsilon
 
         self.trajectories = None
@@ -27,7 +31,7 @@ class SequentialReebGraph(DiGraph):
         
         for t in range(traj.shape[0]):
             # find the bundle distances
-            bundle_norms = self.norm(self.bundle_centers[t] - traj[t].reshape(1, -1), axis=1)
+            bundle_norms = self.dist(self.bundle_centers[t], traj[t].reshape(1, -1), axis=1)
 
             traj_bundle = np.argmin(bundle_norms)
 
