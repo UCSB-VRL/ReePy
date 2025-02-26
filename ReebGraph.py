@@ -11,22 +11,31 @@ class SequentialReebGraph(DiGraph):
     def euclidean_distance(x, y, axis=0):
         return np.linalg.norm(x - y, axis=axis)
 
-    def __init__(self, dist=euclidean_distance, epsilon=0.3):
+    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False):
         super().__init__()
         self.dist = dist
         self.epsilon = epsilon
 
-        self.trajectories = None
+        if store_trajectories:
+            self.trajectories = None
+        else:
+            self.trajectories = 0
+
+        self.store_trajectories = store_trajectories
+
 
         self.bundle_centers = None 
         self.bundle_trajectories = None
 
     def append_trajectory(self, traj: np.ndarray):
         # append a trajectory to the reeb graph
-        if self.trajectories is None:
+        if (self.store_trajectories and self.trajectories is None) or (not self.store_trajectories and self.trajectories == 0):
             self.bundle_centers = [np.array([traj[i]], ndmin=1) for i in range(traj.shape[0])]
             self.bundle_trajectories = [[[0]] for i in range(traj.shape[0])]
-            self.trajectories = traj.reshape(1, -1)
+            if self.store_trajectories:
+                self.trajectories = traj.reshape(1, -1)
+            else:
+                self.trajectories += 1
             return
         
         for t in range(traj.shape[0]):
@@ -37,13 +46,16 @@ class SequentialReebGraph(DiGraph):
 
             if bundle_norms[traj_bundle] < self.epsilon:
                 # TODO: should we move the bundle around?
-                self.bundle_trajectories[t][traj_bundle] = np.append(self.bundle_trajectories[t][traj_bundle], self.trajectories.shape[0])
+                self.bundle_trajectories[t][traj_bundle] = np.append(self.bundle_trajectories[t][traj_bundle], self.trajectories.shape[0] if self.store_trajectories else self.trajectories)
             else:
                 # create a new bundle
                 self.bundle_centers[t] = np.vstack((self.bundle_centers[t], np.array([traj[t]], ndmin=1)))
-                self.bundle_trajectories[t].append(np.array(self.trajectories.shape[0], ndmin=1))
+                self.bundle_trajectories[t].append(np.array(self.trajectories.shape[0] if self.store_trajectories else self.trajectories, ndmin=1))
             
-        self.trajectories = np.vstack((self.trajectories, traj.reshape(1, -1)))
+        if self.store_trajectories:
+            self.trajectories = np.vstack((self.trajectories, traj.reshape(1, -1)))
+        else:
+            self.trajectories += 1
     
     def build_graph(self):
         # start by adding all the bundles at the start of the graph
