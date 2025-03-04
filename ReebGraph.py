@@ -67,8 +67,6 @@ class SequentialReebGraph(DiGraph):
         active_nodes = np.hstack((np.zeros((self.bundle_centers[0].shape[0], 1)), self.bundle_centers[0]))
         active_bundles = [tuple(bundle) for bundle in self.bundle_trajectories[0]]
 
-        # print(type(active_bundles[0]))
-
         for row in active_nodes:
             self.add_node(tuple(row))
 
@@ -98,8 +96,11 @@ class SequentialReebGraph(DiGraph):
                     for traj in bundle: 
                         for j, active_bundle in enumerate(active_bundles):
                             if traj in active_bundle:
-                                # print(f"Adding edge from {active_nodes[j]} to {new_node}")
-                                self.add_edge(tuple(active_nodes[j]), tuple(new_node))
+                                p_idx = next(i for i, tbundle in enumerate(self.bundle_trajectories[t-1]) if active_bundle == tuple(tbundle))
+                                p_node = tuple(np.hstack((t - 1, self.bundle_centers[t-1][p_idx])))
+                                self.add_node(p_node)
+                                self.add_edge(tuple(active_nodes[j]), p_node)
+                                self.add_edge(p_node, tuple(new_node))
                                 old_bundles_index.append(j)
                                 break
                     
