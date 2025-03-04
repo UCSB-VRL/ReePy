@@ -98,9 +98,14 @@ class SequentialReebGraph(DiGraph):
                             if traj in active_bundle:
                                 p_idx = next(i for i, tbundle in enumerate(self.bundle_trajectories[t-1]) if active_bundle == tuple(tbundle))
                                 p_node = tuple(np.hstack((t - 1, self.bundle_centers[t-1][p_idx])))
-                                self.add_node(p_node)
-                                self.add_edge(tuple(active_nodes[j]), p_node)
-                                self.add_edge(p_node, tuple(new_node))
+
+                                if p_node != tuple(active_nodes[j]):
+                                    self.add_node(p_node)
+                                    self.add_edge(tuple(active_nodes[j]), p_node, weight=1.0)
+                                if ((p_node, tuple(new_node)) not in self.edges):
+                                    self.add_edge(p_node, tuple(new_node), weight=1/len(active_bundle))
+                                else:
+                                    self.edges[p_node, tuple(new_node)]['weight'] += 1/len(active_bundle)
                                 old_bundles_index.append(j)
                                 break
                     
