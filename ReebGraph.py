@@ -81,7 +81,7 @@ class SequentialReebGraph(DiGraph):
 
             for i, bundle in enumerate(next_bundles):
                 # Note: always add the last bundle
-                if bundle not in active_bundles or t == len(self.bundle_centers) - 1:
+                if bundle not in active_bundles:
                     # Add this bundle as a new node
                     new_node = np.hstack((t, self.bundle_centers[t][i]))
                     self.add_node(tuple(new_node))
@@ -108,6 +108,21 @@ class SequentialReebGraph(DiGraph):
                                     self.edges[p_node, tuple(new_node)]['weight'] += 1/len(active_bundle)
                                 old_bundles_index.append(j)
                                 break
+                elif t == len(self.bundle_centers) - 1: # special case: always include disappear events (nearly identical code)
+                    new_node = np.hstack((t, self.bundle_centers[t][i]))
+                    self.add_node(tuple(new_node))
+                    new_bundles.append(bundle)
+                    new_nodes = np.vstack((new_nodes, new_node))
+                    for traj in bundle: 
+                        for j, active_bundle in enumerate(active_bundles):
+                            if traj in active_bundle:
+                                if ((p_node, tuple(new_node)) not in self.edges):
+                                    self.add_edge(tuple(active_nodes[j]), tuple(new_node), weight=1/len(active_bundle))
+                                else:
+                                    self.edges[tuple(active_nodes[j]), tuple(new_node)]['weight'] += 1/len(active_bundle)
+                                old_bundles_index.append(j)
+                                break
+
                     
             # remove each of the old bundles, in reverse
             for j in np.unique(np.array(old_bundles_index))[::-1]:
