@@ -10,9 +10,12 @@ TODO: generalize axis beyond default (0)
 class SequentialReebGraph(DiGraph):
     @staticmethod
     def euclidean_distance(x, y, axis=0):
-        return np.linalg.norm(x - y, axis=axis)
+        distance_vector = np.linalg.norm(x - y, axis=axis)
+        nan_mask = np.logical_and(np.isnan(x), np.isnan(y)).flatten()
+        distance_vector[nan_mask] = 0
+        return distance_vector
 
-    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False):
+    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False, MASK=np.nan):
         super().__init__()
         self.dist = dist
         self.epsilon = epsilon
@@ -27,6 +30,8 @@ class SequentialReebGraph(DiGraph):
 
         self.bundle_centers = None 
         self.bundle_trajectories = None
+
+        self.MASK = MASK
     
 
     def __append(self, traj: np.ndarray):
