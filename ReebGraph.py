@@ -28,21 +28,20 @@ class SequentialReebGraph(DiGraph):
 
         self.store_trajectories = store_trajectories
 
-
         self.bundles = None
 
     def __append(self, traj: np.ndarray):
+        # TODO: move this outside the helper function for speed
         if self.bundles is None:
             self.bundles = [SimpleNamespace(centers=np.array([], ndmin=len(traj.shape) - 1), trajectories=[]) for _ in range(traj.shape[0])]
 
             if self.store_trajectories:
-                self.trajectories = traj.reshape(1, -1)
-            else:
-                self.trajectories += 1
-            return
+                self.trajectories = np.empty((0, *traj.shape))
+        
+        trajectory_index = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
         
         for t in range(traj.shape[0]):
-            if traj[t] == np.nan:
+            if np.any(traj[t] == np.nan):
                 continue
             elif self.bundles[t].centers.shape[0] > 0:
                 bundle_norms = self.dist(self.bundles[t].centers, traj[t], axis=1)
@@ -50,17 +49,17 @@ class SequentialReebGraph(DiGraph):
 
                 if bundle_norms[traj_bundle] < self.epsilon:
                     # TODO: adjust bundle centers dynamically based on epsilon
-                    self.bundles[t].trajectories = np.append(self.bundles[t].trajectories[traj_bundle], self.trajectories.shape[0] if self.store_trajectories else self.trajectories)
+                    self.bundles[t].trajectories[traj_bundle] = np.append(self.bundles[t].trajectories[traj_bundle], trajectory_index)
                 else:
                     # create a new bundle
                     self.bundles[t].centers = np.vstack((self.bundles[t].centers, np.array([traj[t]], ndmin=1)))
-                    self.bundles[t].trajectories = np.append(self.bundles[t].trajectories, (np.array(self.trajectories.shape[0] if self.store_trajectories else self.trajectories, ndmin=1)))
+                    self.bundles[t].trajectories.append(np.array([trajectory_index], ndmin=1))
             else:
                 self.bundles[t].centers = np.array([traj[t]], ndmin=1)
-                self.bundles[t].trajectories = np.append(self.bundles[t].trajectories, (np.array(self.trajectories.shape[0] if self.store_trajectories else self.trajectories, ndmin=1)))
+                self.bundles[t].trajectories = [np.array([trajectory_index], ndmin=1)]
             
         if self.store_trajectories:
-            self.trajectories = np.vstack((self.trajectories, traj.reshape(1, -1)))
+            self.trajectories = np.vstack((self.trajectories, traj[np.newaxis, ...]))
         else:
             self.trajectories += 1
 
