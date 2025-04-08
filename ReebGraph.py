@@ -2,6 +2,7 @@ from networkx.classes import DiGraph
 from dataclasses import dataclass
 import numpy as np
 from collections.abc import Iterable
+from types import SimpleNamespace
 
 """
 Sequential Reeb Graph - assumes no explicit time dimension (fixed sampling rate)
@@ -10,15 +11,15 @@ TODO: generalize axis beyond default (0)
 class SequentialReebGraph(DiGraph):
     @staticmethod
     def euclidean_distance(x, y, axis=0):
-        distance_vector = np.linalg.norm(x - y, axis=axis)
-        nan_mask = np.logical_and(np.isnan(x), np.isnan(y)).flatten()
-        distance_vector[nan_mask] = 0
-        return distance_vector
+        # note: the distance function must handle masked trajectories (nan values) 
+        return np.linalg.norm(x - y, axis=axis)
 
-    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False, MASK=np.nan):
+
+    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False, mask=np.nan):
         super().__init__()
         self.dist = dist
         self.epsilon = epsilon
+        self.mask = mask
 
         if store_trajectories:
             self.trajectories = None
@@ -28,17 +29,12 @@ class SequentialReebGraph(DiGraph):
         self.store_trajectories = store_trajectories
 
 
-        self.bundle_centers = None 
-        self.bundle_trajectories = None
-
-        self.MASK = MASK
-    
+        self.bundles = None
 
     def __append(self, traj: np.ndarray):
-        # append a trajectory to the reeb graph
-        if (self.store_trajectories and self.trajectories is None) or (not self.store_trajectories and self.trajectories == 0):
-            self.bundle_centers = [np.array([traj[i]], ndmin=1) for i in range(traj.shape[0])]
-            self.bundle_trajectories = [[[0]] for i in range(traj.shape[0])]
+        if self.bundles is None:
+            self.bundles = [SimpleNamespace(centers=np.array([], ndmin=len(traj.shape) - 1), trajectories=[]) for _ in range(traj.shape[0])]
+
             if self.store_trajectories:
                 self.trajectories = traj.reshape(1, -1)
             else:
@@ -46,18 +42,22 @@ class SequentialReebGraph(DiGraph):
             return
         
         for t in range(traj.shape[0]):
-            # find the bundle distances
-            bundle_norms = self.dist(self.bundle_centers[t], traj[t], axis=1)
+            if traj[t] == np.nan:
+                continue
+            elif self.bundles[t].centers.shape[0] > 0:
+                bundle_norms = self.dist(self.bundles[t].centers, traj[t], axis=1)
+                traj_bundle = np.argmin(bundle_norms)
 
-            traj_bundle = np.argmin(bundle_norms)
-
-            if bundle_norms[traj_bundle] < self.epsilon:
-                # TODO: should we move the bundle around?
-                self.bundle_trajectories[t][traj_bundle] = np.append(self.bundle_trajectories[t][traj_bundle], self.trajectories.shape[0] if self.store_trajectories else self.trajectories)
+                if bundle_norms[traj_bundle] < self.epsilon:
+                    # TODO: adjust bundle centers dynamically based on epsilon
+                    self.bundles[t].trajectories = np.append(self.bundles[t].trajectories[traj_bundle], self.trajectories.shape[0] if self.store_trajectories else self.trajectories)
+                else:
+                    # create a new bundle
+                    self.bundles[t].centers = np.vstack((self.bundles[t].centers, np.array([traj[t]], ndmin=1)))
+                    self.bundles[t].trajectories = np.append(self.bundles[t].trajectories, (np.array(self.trajectories.shape[0] if self.store_trajectories else self.trajectories, ndmin=1)))
             else:
-                # create a new bundle
-                self.bundle_centers[t] = np.vstack((self.bundle_centers[t], np.array([traj[t]], ndmin=1)))
-                self.bundle_trajectories[t].append(np.array(self.trajectories.shape[0] if self.store_trajectories else self.trajectories, ndmin=1))
+                self.bundles[t].centers = np.array([traj[t]], ndmin=1)
+                self.bundles[t].trajectories = np.append(self.bundles[t].trajectories, (np.array(self.trajectories.shape[0] if self.store_trajectories else self.trajectories, ndmin=1)))
             
         if self.store_trajectories:
             self.trajectories = np.vstack((self.trajectories, traj.reshape(1, -1)))
