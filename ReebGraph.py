@@ -1,3 +1,4 @@
+from quopri import decodestring
 from networkx.classes import DiGraph
 from dataclasses import dataclass
 import numpy as np
@@ -41,7 +42,7 @@ class SequentialReebGraph(DiGraph):
         trajectory_index = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
         
         for t in range(traj.shape[0]):
-            if np.any(traj[t] == np.nan):
+            if np.any(np.isnan(traj[t])):
                 continue
             elif self.bundles[t].centers.shape[0] > 0:
                 bundle_norms = self.dist(self.bundles[t].centers, traj[t], axis=1)
@@ -64,78 +65,80 @@ class SequentialReebGraph(DiGraph):
             self.trajectories += 1
 
     def __build_graph(self):
-        # delete all nodes and edges
-        self.clear()
+        def __sort_bundles(bundles):
+            if bundles.centers.shape[0] == 0:
+                return
 
-        # start by adding all the bundles at the start of the graph
-        active_nodes = np.hstack((np.zeros((self.bundle_centers[0].shape[0], 1)), self.bundle_centers[0]))
-        active_bundles = [tuple(bundle) for bundle in self.bundle_trajectories[0]]
+            bundle_order = np.argsort([len(trajectories) for trajectories in bundles.trajectories])
+            bundles.centers = bundles.centers[bundle_order]
+            bundles.trajectories = [bundles.trajectories[i] for i in bundle_order]
 
-        for row in active_nodes:
-            self.add_node(tuple(row))
+        nodes = [(0, *tuple(center)) for center in self.bundles[0].centers if not np.any(np.isnan(center))]
+        connected_components = self.bundles[0].trajectories
 
-        for t in range(1, len(self.bundle_centers)):
-            next_bundles_matrix = self.bundle_trajectories[t]
-            next_bundles = [tuple(bundle) for bundle in next_bundles_matrix]
+        # manually map the trajectories to their respective bundles
+        trajectory_count = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
+        bundles = [None] * trajectory_count
+        for i, bundle in enumerate(self.bundles[0].trajectories):
+            for traj in bundle:
+                bundles[traj] = i
 
-            old_bundles_index = []
+        for node in nodes:
+            self.add_node(node)
+        
+        for t in range(1, len(self.bundles)):
+            new_bundles = [None] * trajectory_count
 
-            new_bundles = []
-            new_nodes = np.empty((0, active_nodes.shape[1]))
+            edges = np.empty((0, 2), dtype=int)
+            reappear_events = []
 
-            for i, bundle in enumerate(next_bundles):
-                # Note: always add the last bundle
-                if bundle not in active_bundles:
-                    # Add this bundle as a new node
-                    new_node = np.hstack((t, self.bundle_centers[t][i]))
-                    self.add_node(tuple(new_node))
-                    # print(f"{t}: {bundle} not in active bundles. Adding new node {new_node}")
+            for i, bundle in enumerate(self.bundles[t].trajectories):
+                for traj in bundle:
+                    new_bundles[traj] = i
+                
+            for i, bundle in enumerate(self.bundles[t].trajectories):
+                ip = bundles[bundle[0]] # where was this in the previous time step?
 
-                    new_bundles.append(bundle)
-                    new_nodes = np.vstack((new_nodes, new_node))
+                # assumption: more trajectories than bundles
+                if ip is not None and len(connected_components[ip]) == len(bundle) and all([t1 == t2 for t1, t2 in zip(connected_components[ip], bundle)]):
+                    continue
+                else:
+                    for j, traj in enumerate(bundle):
+                        if bundles[traj] is not None:
+                            edges = np.vstack((edges, [bundles[traj], new_bundles[traj]]))
+                        else:
+                            # add this node in-place (re-appear event)
+                            reappear_events.append((t, *tuple(self.bundles[t].centers[i])))
 
+            # get unique rows of edges along with counts (for weights)
+            unique_edges, counts = np.unique(edges, axis=0, return_counts=True)
 
-                    # find all bundles which this should replace
-                    # for each trajectory, check all bundles in active_bundles and see if it matches
-                    for traj in bundle: 
-                        for j, active_bundle in enumerate(active_bundles):
-                            if traj in active_bundle:
-                                p_idx = next(i for i, tbundle in enumerate(self.bundle_trajectories[t-1]) if active_bundle == tuple(tbundle))
-                                p_node = tuple(np.hstack((t - 1, self.bundle_centers[t-1][p_idx])))
+            origin_nodes = np.unique(unique_edges[:, 0])
+            destination_nodes = np.unique(unique_edges[:, 1])
 
-                                if p_node != tuple(active_nodes[j]):
-                                    self.add_node(p_node)
-                                    self.add_edge(tuple(active_nodes[j]), p_node, weight=1.0)
-                                if ((p_node, tuple(new_node)) not in self.edges):
-                                    self.add_edge(p_node, tuple(new_node), weight=1/len(active_bundle))
-                                else:
-                                    self.edges[p_node, tuple(new_node)]['weight'] += 1/len(active_bundle)
-                                old_bundles_index.append(j)
-                                break
-                elif t == len(self.bundle_centers) - 1: # special case: always include disappear events (nearly identical code)
-                    new_node = np.hstack((t, self.bundle_centers[t][i]))
-                    self.add_node(tuple(new_node))
-                    new_bundles.append(bundle)
-                    new_nodes = np.vstack((new_nodes, new_node))
-                    for traj in bundle: 
-                        for j, active_bundle in enumerate(active_bundles):
-                            if traj in active_bundle:
-                                if ((p_node, tuple(new_node)) not in self.edges):
-                                    self.add_edge(tuple(active_nodes[j]), tuple(new_node), weight=1/len(active_bundle))
-                                else:
-                                    self.edges[tuple(active_nodes[j]), tuple(new_node)]['weight'] += 1/len(active_bundle)
-                                old_bundles_index.append(j)
-                                break
+            old_node_count = len(nodes)
 
-                    
-            # remove each of the old bundles, in reverse
-            for j in np.unique(np.array(old_bundles_index))[::-1]:
-                active_bundles.pop(j)
-                active_nodes = np.delete(active_nodes, j, axis=0)
+            # create destination nodes
+            for dest in destination_nodes:
+                nodes.append((t, *tuple(self.bundles[t].centers[dest])))
+                self.add_node((t, *tuple(self.bundles[t].centers[dest])))
+            
+            for node in reappear_events:
+                nodes.append(node)
+                self.add_node(node)
+                print(node)
+            
+            new_node_count = len(nodes) - old_node_count
 
-            # add the new bundles
-            active_bundles += new_bundles
-            active_nodes = np.vstack((active_nodes, new_nodes))
+            print(f"Added {new_node_count} new nodes at time {t}")
+            
+            for edge in unique_edges:
+                origin, destination = edge
+                # print(f"[{nodes[origin]}] -> [{nodes[destination + old_node_count]}]")
+            
+            connected_components = self.bundles[t].trajectories
+            bundles = new_bundles
+
 
     def append_trajectory(self, traj: np.ndarray, compute_graph=True):
         self.__append(traj)
