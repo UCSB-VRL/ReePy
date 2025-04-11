@@ -1,3 +1,4 @@
+from itertools import count
 from quopri import decodestring
 from networkx.classes import DiGraph
 from dataclasses import dataclass
@@ -16,11 +17,29 @@ class SequentialReebGraph(DiGraph):
         return np.linalg.norm(x - y, axis=axis)
 
 
-    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False, mask=np.nan):
+    """
+    Sequential Reeb Graph constructor
+    Parameters
+    ----------
+    dist : callable
+        Distance function to use for computing distances between points.
+        Default is euclidean_distance.
+    epsilon : float
+        Distance threshold for determining if two points are in the same bundle.
+        Default is 1.
+    store_trajectories : bool
+        If True, store the trajectories in the graph.
+        If False, store the number of trajectories.
+        Default is False.
+    trajectory_shape : tuple
+        Shape of the trajectory data.
+        If provided, initializes the graph with the specified shape. This is very important for improving graph computation speed.
+    """
+    def __init__(self, dist=euclidean_distance, epsilon=1, store_trajectories=False, 
+                 trajectory_shape=None):
         super().__init__()
         self.dist = dist
         self.epsilon = epsilon
-        self.mask = mask
 
         if store_trajectories:
             self.trajectories = None
@@ -31,13 +50,16 @@ class SequentialReebGraph(DiGraph):
 
         self.bundles = None
 
-    def __append(self, traj: np.ndarray):
-        # TODO: move this outside the helper function for speed
-        if self.bundles is None:
-            self.bundles = [SimpleNamespace(centers=np.array([], ndmin=len(traj.shape) - 1), trajectories=[]) for _ in range(traj.shape[0])]
+        if trajectory_shape is not None:
+            self.__initialize(trajectory_shape)
+    
+    def __initialize(self, traj_shape):
+        self.bundles = [SimpleNamespace(centers=np.array([], ndmin=1), trajectories=[]) for _ in range(traj_shape[0])]
+        self.trajectories = np.empty((0, *traj_shape)) if self.store_trajectories else 0
 
-            if self.store_trajectories:
-                self.trajectories = np.empty((0, *traj.shape))
+    def __append(self, traj: np.ndarray):
+        if self.bundles is None:
+            self.__initialize(traj.shape)
         
         trajectory_index = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
         
@@ -65,79 +87,65 @@ class SequentialReebGraph(DiGraph):
             self.trajectories += 1
 
     def __build_graph(self):
-        def __sort_bundles(bundles):
-            if bundles.centers.shape[0] == 0:
-                return
+        # initialize appear events
+        traj_count = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
 
-            bundle_order = np.argsort([len(trajectories) for trajectories in bundles.trajectories])
-            bundles.centers = bundles.centers[bundle_order]
-            bundles.trajectories = [bundles.trajectories[i] for i in bundle_order]
+        # initialize iteration variables
+        concomp = self.bundles[0].trajectories
 
-        nodes = [(0, *tuple(center)) for center in self.bundles[0].centers if not np.any(np.isnan(center))]
-        connected_components = self.bundles[0].trajectories
-
-        # manually map the trajectories to their respective bundles
-        trajectory_count = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
-        bundles = [None] * trajectory_count
-        for i, bundle in enumerate(self.bundles[0].trajectories):
-            for traj in bundle:
-                bundles[traj] = i
-
+        nodes = [
+            (0, *centroid) for centroid in self.bundles[0].centers
+        ]
         for node in nodes:
             self.add_node(node)
-        
-        for t in range(1, len(self.bundles)):
-            new_bundles = [None] * trajectory_count
+
+        tb_lut = [np.nan] * traj_count
+        for bidx, bundle in enumerate(concomp):
+            for traj in bundle:
+                tb_lut[traj] = bidx
+
+        for t, bundles in enumerate(self.bundles[1:], start=1):
+            new_concomp = bundles.trajectories
+            new_nodes = []
 
             edges = np.empty((0, 2), dtype=int)
-            reappear_events = []
 
-            for i, bundle in enumerate(self.bundles[t].trajectories):
+            new_tb_lut = [np.nan] * traj_count
+            for bidx, bundle in enumerate(new_concomp):
                 for traj in bundle:
-                    new_bundles[traj] = i
+                    new_tb_lut[traj] = bidx
                 
-            for i, bundle in enumerate(self.bundles[t].trajectories):
-                ip = bundles[bundle[0]] # where was this in the previous time step?
+                # look up which bundle this trajectory belonged to in the previous timestep
+                pbidx = tb_lut[bundle[0]]
 
-                # assumption: more trajectories than bundles
-                if ip is not None and len(connected_components[ip]) == len(bundle) and all([t1 == t2 for t1, t2 in zip(connected_components[ip], bundle)]):
-                    continue
+                if not np.isnan(pbidx) and len(concomp[pbidx]) == len(bundle) and all([bundle[_] == concomp[pbidx][_] for _ in range(len(bundle))]):
+                    new_nodes.append(nodes[pbidx])
                 else:
-                    for j, traj in enumerate(bundle):
-                        if bundles[traj] is not None:
-                            edges = np.vstack((edges, [bundles[traj], new_bundles[traj]]))
-                        else:
-                            # add this node in-place (re-appear event)
-                            reappear_events.append((t, *tuple(self.bundles[t].centers[i])))
-
-            # get unique rows of edges along with counts (for weights)
+                    for traj in bundle:
+                        edges = np.vstack((edges, (tb_lut[traj], bidx)))
+                    new_nodes.append((t, *bundles.centers[bidx]))
+        
             unique_edges, counts = np.unique(edges, axis=0, return_counts=True)
 
-            origin_nodes = np.unique(unique_edges[:, 0])
+            origin_nodes, origin_node_counts = np.unique(edges[:, 0], return_counts=True)
+            origin_nodes = np.column_stack((origin_nodes, origin_node_counts))
+            origin_nodes = origin_nodes[~np.isnan(origin_nodes[:, 0])]
+
+            origin_edgecount_vector = np.zeros(len(nodes))
+            origin_edgecount_vector[origin_nodes[:, 0].astype(int)] = origin_nodes[:, 1].astype(int)
+
             destination_nodes = np.unique(unique_edges[:, 1])
 
-            old_node_count = len(nodes)
-
-            # create destination nodes
-            for dest in destination_nodes:
-                nodes.append((t, *tuple(self.bundles[t].centers[dest])))
-                self.add_node((t, *tuple(self.bundles[t].centers[dest])))
+            for node in destination_nodes:
+                self.add_node(new_nodes[int(node)])  
             
-            for node in reappear_events:
-                nodes.append(node)
-                self.add_node(node)
-                print(node)
+            for edx, edge in enumerate(unique_edges):
+                if not np.isnan(edge[0]):
+                    self.add_edge(nodes[int(edge[0])], new_nodes[int(edge[1])], weight=counts[edx]/origin_edgecount_vector[int(edge[0])])
             
-            new_node_count = len(nodes) - old_node_count
-
-            print(f"Added {new_node_count} new nodes at time {t}")
-            
-            for edge in unique_edges:
-                origin, destination = edge
-                # print(f"[{nodes[origin]}] -> [{nodes[destination + old_node_count]}]")
-            
-            connected_components = self.bundles[t].trajectories
-            bundles = new_bundles
+            concomp = new_concomp
+            nodes = new_nodes
+            tb_lut = new_tb_lut
 
 
     def append_trajectory(self, traj: np.ndarray, compute_graph=True):
