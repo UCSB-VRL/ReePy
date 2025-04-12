@@ -159,6 +159,45 @@ class SequentialReebGraph(DiGraph):
         if compute_graph:
             self.__build_graph()
     
+    """
+    Note: epsilon should be at least the sum of the two epsilon values
+    """
+    def append_reeb(self, other, compute_graph=True, epsilon=None):
+        if epsilon is not None:
+            self.epsilon = epsilon
+
+        if self.bundles is None:
+            self.__initialize(other.trajectories.shape[1:])
+
+        traj_count = self.trajectories.shape[0] if self.store_trajectories else self.trajectories
+
+        for t in range(len(other.bundles)):
+            for bidx in range(len(other.bundles[t].trajectories)):
+                bundle_trajs = [t + traj_count for t in other.bundles[t].trajectories[bidx]]
+                bundle_center = other.bundles[t].centers[bidx]
+
+                # for each bundle, check if it is within epsilon of any existing bundle
+                if self.bundles[t].centers.shape[0] > 0:
+                    bundle_norms = self.dist(self.bundles[t].centers, bundle_center, axis=1)
+                    nearest_bundle = np.argmin(bundle_norms)
+
+                    if bundle_norms[nearest_bundle] < self.epsilon:
+                        self.bundles[t].trajectories[nearest_bundle] = np.append(self.bundles[t].trajectories[nearest_bundle], bundle_trajs)
+                    else:
+                        self.bundles[t].centers = np.vstack((self.bundles[t].centers, bundle_center))
+                        self.bundles[t].trajectories.append(bundle_trajs)
+                else:
+                    # Highly unlikely for this to be called
+                    self.bundles[t].centers = np.array([bundle_center], ndmin=1)
+                    self.bundles[t].trajectories = [bundle_trajs]
+        
+        if self.store_trajectories and other.store_trajectories:
+            self.trajectories = np.vstack((self.trajectories, other.trajectories))
+        elif other.store_trajectories:
+            self.trajectories += other.trajectories.shape[0]
+        else:
+            self.trajectories += other.trajectories
+    
     def union(self, other, compute_graph=True, adjust_epsilon=1):
         assert self.dist == other.dist, "Distance functions must be the same"
         assert self.epsilon == other.epsilon, "Epsilon must be the same" 
