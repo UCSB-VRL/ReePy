@@ -162,7 +162,7 @@ class SequentialReebGraph(DiGraph):
     """
     Note: epsilon should be at least the sum of the two epsilon values
     """
-    def append_reeb(self, other, compute_graph=True, epsilon=None):
+    def append_reeb(self, other, epsilon, compute_graph=True):
         if epsilon is not None:
             self.epsilon = epsilon
 
