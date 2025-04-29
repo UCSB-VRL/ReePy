@@ -96,8 +96,8 @@ class SequentialReebGraph(DiGraph):
         nodes = [
             (0, *centroid) for centroid in self.bundles[0].centers
         ]
-        for node in nodes:
-            self.add_node(node)
+        for node_index, node in enumerate(nodes):
+            self.add_node(node, trajectories=concomp[node_index])
 
         tb_lut = [np.nan] * traj_count
         for bidx, bundle in enumerate(concomp):
@@ -137,7 +137,7 @@ class SequentialReebGraph(DiGraph):
             destination_nodes = np.unique(unique_edges[:, 1])
 
             for node in destination_nodes:
-                self.add_node(new_nodes[int(node)])  
+                self.add_node(new_nodes[int(node)], trajectories=new_concomp[int(node)])  
             
             for edx, edge in enumerate(unique_edges):
                 if not np.isnan(edge[0]):
