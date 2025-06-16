@@ -1,39 +1,28 @@
-[tool.poetry]
-name = "reebpy"
+[project]
+name = "reepy"
 version = "0.1.0"
-description = "Python libary for building Reeb graphs from sequence data"
-authors = ["Vision Research Lab, UCSB"]
+description = "Add your description here"
 readme = "README.md"
+authors = [
+    { name = "Anantajit Subrahmanya", email = "anantajit@ucsb.edu" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "networkx>=3.4.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = "^2.1.2"
-networkx = "^3.4.2"
-scikit-learn = "^1.5.2"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.3"
-pandas = "^2.2.3"
-black = "^24.10.0"
+[project.scripts]
+reepy = "reepy:main"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.black]
-line-length = 88
-target-version = ['py38']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "reepy",
+]
+
+[tool.uv.sources]
+reepy = { workspace = true }
