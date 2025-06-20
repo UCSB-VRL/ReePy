@@ -7,8 +7,10 @@ authors = [
     { name = "Anantajit Subrahmanya", email = "anantajit@ucsb.edu" }
 ]
 requires-python = ">=3.10"
+
 dependencies = [
     "networkx>=3.4.2",
+    "pandas>=2.3.0",
 ]
 
 [project.scripts]

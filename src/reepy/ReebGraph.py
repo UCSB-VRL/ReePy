@@ -3,7 +3,7 @@ from typing import Iterable
 
 class ReebGraph(DiGraph):
     def __init__(self):
-        pass
+        self.bundles = None
 
     def append_trajectory(self, traj):
         raise NotImplementedError()
@@ -14,4 +14,3 @@ class ReebGraph(DiGraph):
     
     def union(self, other):
         raise NotImplementedError()
-    
