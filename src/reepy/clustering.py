@@ -21,6 +21,7 @@ class KDArray:
         return indices, points
 
 # note: this clusterer is extremely slow and will not lead to optimal cluster formation
+#       points should be a pandas dataframe of features
 class NaiveClusterer:
     def __init__(self, points, epsilon, dist=None):
         self.points = points
@@ -40,10 +41,10 @@ class NaiveClusterer:
         while len(unclustered) > 0:
             index = unclustered.pop()
             cluster = [index]
-            centroid = self.points[index]
+            centroid = self.points.iloc[index]
 
             for i in list(unclustered):
-                if self.dist(centroid, self.points[i]) <= self.epsilon:
+                if self.dist(centroid, self.points.iloc[i]) <= self.epsilon:
                     cluster.append(i)
                     unclustered.remove(i)
             
