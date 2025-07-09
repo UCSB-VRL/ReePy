@@ -14,16 +14,22 @@ class SparseReebGraph(ReebGraph):
         self.epsilon = epsilon
         self.dist = dist
 
+        self.clusterer = None
+        self.bundles = None
+        self.trajc = 0
+
     def append_trajectory(self, traj):
         raise NotImplementedError("SparseReebGraph does not support incremental updates (yet)")
     
     def append_trajectories(self, trajs):
-        clusterer = self.Clusterer(trajs, self.epsilon, dist=self.dist)
+        if self.clusterer is None:
+            self.clusterer = self.Clusterer(trajs, self.epsilon, dist=self.dist)
+            clusters, centroids = self.clusterer.cluster()
+        else:
+            clusters, centroids = self.clusterer.incr_cluster(trajs, init=self.bundles, index=self.trajc)
 
-        clusters, centroids = clusterer.cluster()
-
+        self.trajc += len(trajs)
         self.bundles = {
             "centroids": centroids,
             "clusters": clusters
         }
-    

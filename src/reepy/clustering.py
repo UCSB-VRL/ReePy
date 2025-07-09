@@ -50,5 +50,28 @@ class NaiveClusterer:
             
             clusters.append(cluster)
             centroids.append(centroid)
-        
         return clusters, centroids
+
+    # incremental clustering algorithm
+    def incr_cluster(self, points, init=None, index=0):
+        if init is not None:
+            new_clusters = init["clusters"]
+            new_centroids = init["centroids"]
+        else:
+            new_clusters = []
+            new_centroids = []
+
+        for _, point in points.iterrows():
+            found = False
+
+            for i, centroid in enumerate(new_centroids):
+                if self.dist(centroid, point) <= self.epsilon:
+                    new_clusters[i].append(index)
+                    found = True
+                    break
+            
+            if not found:
+                new_clusters.append([index])
+                new_centroids.append(point)
+        
+        return new_clusters, new_centroids
