@@ -3,6 +3,7 @@ from typing import Iterable
 
 class ReebGraph(DiGraph):
     def __init__(self):
+        super().__init__()
         self.bundles = None
 
     def append_trajectory(self, traj):

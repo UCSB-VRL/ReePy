@@ -4,7 +4,7 @@ import pandas as pd
 from .clustering import NaiveClusterer
 
 class SparseReebGraph(ReebGraph):
-    def __init__(self, clusterer=None, epsilon=1e-5, dist=None):
+    def __init__(self, clusterer=None, epsilon=1e-5, dist=None, trajectory_column="agent"):
         super().__init__()
 
         if clusterer is None:
@@ -14,9 +14,12 @@ class SparseReebGraph(ReebGraph):
         self.epsilon = epsilon
         self.dist = dist
 
+        self.trajectory_column = trajectory_column
+
         self.clusterer = None
         self.bundles = None
         self.trajc = 0
+
 
     def append_trajectory(self, traj):
         raise NotImplementedError("SparseReebGraph does not support incremental updates (yet)")
@@ -28,7 +31,8 @@ class SparseReebGraph(ReebGraph):
         else:
             clusters, centroids = self.clusterer.incr_cluster(trajs, init=self.bundles, index=self.trajc)
 
-        self.trajc += len(trajs)
+        self.trajc += trajs[self.trajectory_column].nunique()
+
         self.bundles = {
             "centroids": centroids,
             "clusters": clusters
