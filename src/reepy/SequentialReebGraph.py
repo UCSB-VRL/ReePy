@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 class SequentialReebGraph(ReebGraph):
-    def __init__(self, clusterer=None, epsilon=1e-5, dist=None):
+    def __init__(self, clusterer=None, epsilon=1e-5, dist=None, store_trajectories=False):
         super().__init__()
 
         # Set up the clusterer object
@@ -22,8 +22,17 @@ class SequentialReebGraph(ReebGraph):
         # sequence length
         self.seq_len = None
 
+        self.store = store_trajectories
+        self.trajectories = []
+
     
     def append_trajectory(self, traj: pd.DataFrame):
+        if self.store:
+            if self.trajectories is None:
+                self.trajectories = [traj]
+            else:
+                self.trajectories.append(traj)
+
         if self.seq_len is None:
             self.seq_len = traj.shape[0]
 
