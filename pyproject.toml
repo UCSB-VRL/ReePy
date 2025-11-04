@@ -12,6 +12,7 @@ dependencies = [
     "networkx>=3.4.2",
     "numpy>=2.2.6",
     "pandas>=2.3.0",
+    "sortedcontainers>=2.4.0",
 ]
 
 [project.scripts]
@@ -23,6 +24,7 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "matplotlib>=3.10.7",
     "pytest>=8.4.0",
     "reepy",
 ]
