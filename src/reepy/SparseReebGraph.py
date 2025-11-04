@@ -4,7 +4,8 @@ import numpy as np
 from sortedcontainers import SortedList
 
 def dist(x, y):
-    return np.sqrt(np.sum((x - y) ** 2))
+    # return np.sqrt(np.sum((x - y) ** 2))
+    return np.linalg.norm(x - y)
 
 class SparseReebGraph(ReebGraph):
     # TODO: better characterization of epsilon beyond spherical ball
@@ -54,6 +55,7 @@ class SparseReebGraph(ReebGraph):
                 self._bundles.add((*traj[row], bundle_index))
                 self._bundle_indices[bundle_index] = [self.trajectory_count]
     
+    # each trajectory is N rows, dim + 2 columns
     def append_trajectories(self, trajs):
         pass
 
