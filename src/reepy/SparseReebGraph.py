@@ -64,3 +64,36 @@ class SparseReebGraph(ReebGraph):
             # remove the trajectory dimension
             self.append_trajectory(traj[:, 1:])
 
+        self.build()
+
+    # once trajectories are added, compute the reeb graph
+    def build(self):
+        states = [None] * self.trajectory_count
+        state_nodes = [None] * self.trajectory_count
+
+        edge_count = 0
+
+        for bundle in self._bundles:
+            # get the trajectories present in this bundle
+            cindices = self._bundle_indices[bundle[-1]]
+            # get the trajectories present in the previous bundle
+            pindices = self._bundle_indices[states[cindices[0] - 1]] \
+                if states[cindices[0] - 1] is not None\
+                else None
+
+            if cindices != pindices:
+                # create a new node
+                self.add_node(bundle[-1], label=bundle[:-1])
+
+                mask_indices = set()
+
+                for traj in cindices:
+                    # check if this trajectory has appeared -- if not, mark it
+                    if states[traj - 1] is not None:
+                        # if not, appear event (no edge needed)
+                        mask_indices.add(states[traj - 1])
+                    states[traj - 1] = bundle[-1]
+
+                for dst in mask_indices:
+                    self.add_edge(bundle[-1], dst)
+
