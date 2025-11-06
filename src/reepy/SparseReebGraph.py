@@ -57,5 +57,10 @@ class SparseReebGraph(ReebGraph):
     
     # each trajectory is N rows, dim + 2 columns
     def append_trajectories(self, trajs):
-        pass
+        _, masks = np.unique(trajs[:, 0], return_index=True)
+        trajs_split = np.split(trajs, masks[1:])
+
+        for traj in trajs_split:
+            # remove the trajectory dimension
+            self.append_trajectory(traj[:, 1:])
 
