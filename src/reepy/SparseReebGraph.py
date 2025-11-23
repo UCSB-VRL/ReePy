@@ -3,9 +3,11 @@ from .ReebGraph import ReebGraph
 import numpy as np
 from sortedcontainers import SortedList
 
+# TODO: replace with KD-Tree
+from .naive import NaiveDS
+
 def dist(x, y):
-    # return np.sqrt(np.sum((x - y) ** 2))
-    return np.linalg.norm(x - y)
+    return np.linalg.norm(np.array(x[:-1]) - np.array(y[:-1]))
 
 class SparseReebGraph(ReebGraph):
     # TODO: better characterization of epsilon beyond spherical ball
@@ -13,6 +15,8 @@ class SparseReebGraph(ReebGraph):
         super().__init__()
         self.dim = dim
         self.epsilon = epsilon
+
+        self.DS = NaiveDS
 
         # maintains a sorted list of bundles
         # bundles are (t, x, y, idx) 4-tuples
@@ -30,6 +34,10 @@ class SparseReebGraph(ReebGraph):
         # NOTE: remove these asserts for faster evaluation
         assert traj.shape[1] == self.dim + 1
 
+        # initialize the data structure
+        sstruct = self.DS()
+        t1_min, t1_max = None, None
+
         for row in range(traj.shape[0]):
             # base case
             if len(self._bundles) == 0:
@@ -39,18 +47,32 @@ class SparseReebGraph(ReebGraph):
                 continue
 
             # TODO: incremental tree structure for querying
-            t_min, t_max = traj[row][0] - self.epsilon, traj[row][0] + self.epsilon
-            candidates = self._bundles.irange_key(min_key=t_min, max_key=t_max)
+            t2_min, t2_max = traj[row][0] - self.epsilon, traj[row][0] + self.epsilon
 
-            new_bundle = True
-            for bundle in candidates:
-                if dist(bundle[:self.dim + 1], traj[row]) < self.epsilon:
-                    # add to this bundle
-                    self._bundle_indices[bundle[-1]].append(self.trajectory_count)
-                    new_bundle = False
-                    break
+            # base case
+            if t1_min is None or t1_max is None:
+                candidates = self._bundles.irange_key(min_key=t2_min, 
+                                                      max_key=t2_max)
 
-            if new_bundle:
+                for bundle in candidates:
+                    sstruct.insert(np.array(bundle))
+            else:
+                old_candidates = self._bundles.irange_key(min_key=t1_min,
+                                                          max_key=min(t2_min,
+                                                                      t1_max))
+                new_candidates = self._bundles.irange_key(min_key=max(t1_max,
+                                                                      t2_min),
+                                                          max_key=t2_max)
+                for bundle in old_candidates:
+                    sstruct.remove(np.array(bundle))
+                for bundle in new_candidates:
+                    sstruct.add(np.array(bundle))
+
+
+            nearest_bundle = sstruct.nearest((*traj[row], 0))
+
+            if dist(nearest_bundle, (*traj[row], 0)) < self.epsilon:
+                self._bundle_indices[bundle[-1]].append(self.trajectory_count)
                 bundle_index = len(self._bundle_indices)
                 self._bundles.add((*traj[row], bundle_index))
                 self._bundle_indices[bundle_index] = [self.trajectory_count]
@@ -64,7 +86,7 @@ class SparseReebGraph(ReebGraph):
             # remove the trajectory dimension
             self.append_trajectory(traj[:, 1:])
 
-        self.build()
+        self.build
 
     # once trajectories are added, compute the reeb graph
     def build(self):

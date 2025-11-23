@@ -1,5 +1,4 @@
 from .ReebGraph import ReebGraph
-from .clustering import NaiveClusterer
 import pandas as pd
 import numpy as np
 

@@ -14,9 +14,10 @@ def main():
     data = np.random.rand(K, N, 3) # 2D samples between 0 and 1
     data[:, :, 0] = np.arange(N)/(60 * 60) # time in hours
 
-    reeb = reepy.SparseReebGraph(dim=2, epsilon=0.25) # ~15 minutes
+    reeb = reepy.SparseReebGraph(dim=2, epsilon=0.01) # ~15 minutes
     with pyinstrument.profile():
         for i, traj in enumerate(data):
+            print(i)
             reeb.append_trajectory(traj)
 
     # report bundle statistics
