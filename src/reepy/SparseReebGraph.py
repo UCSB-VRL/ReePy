@@ -5,6 +5,7 @@ from sortedcontainers import SortedList
 
 # TODO: replace with KD-Tree
 from .naive import NaiveDS
+from .kdtree import KDTree
 
 def dist(x, y):
     return np.linalg.norm(x[:-1] - y[:-1])
@@ -16,7 +17,8 @@ class SparseReebGraph(ReebGraph):
         self.dim = dim
         self.epsilon = epsilon
 
-        self.DS = NaiveDS
+        # self.DS = NaiveDS
+        self.DS = KDTree
 
         # maintains a sorted list of bundles
         # bundles are (t, x, y, idx) 4-tuples
@@ -35,7 +37,7 @@ class SparseReebGraph(ReebGraph):
         assert traj.shape[1] == self.dim + 1
 
         # initialize the data structure
-        sstruct = self.DS()
+        # sstruct = self.DS()
         t1_min, t1_max = None, None
 
         for row in range(traj.shape[0]):
@@ -46,36 +48,49 @@ class SparseReebGraph(ReebGraph):
                 self._bundle_indices[bundle_index] = [self.trajectory_count]
                 continue
 
-            # TODO: incremental tree structure for querying
             t2_min, t2_max = traj[row][0] - self.epsilon, traj[row][0] + self.epsilon
 
-            # base case
-            if t1_min is None or t1_max is None:
-                candidates = self._bundles.irange_key(min_key=t2_min, 
-                                                      max_key=t2_max)
+            # non-incremental construction approach
+            candidates = np.array(list(self._bundles.irange_key(min_key=t2_min,
+                                                                max_key=t2_max)))
 
-                for bundle in candidates:
-                    sstruct.insert(np.array(bundle))
+            if len(candidates.shape) != 2:
+                candidates = candidates.reshape(-1, 1)
 
-            else:
-                old_candidates = self._bundles.irange_key(min_key=t1_min,
-                                                          max_key=min(t2_min,
-                                                                      t1_max))
-                new_candidates = self._bundles.irange_key(min_key=max(t1_max,
-                                                                      t2_min),
-                                                          max_key=t2_max)
+            sstruct = self.DS(
+                points=candidates,
+                # last axis is spatially insignificant
+                axes=np.arange(traj.shape[1] - 1, dtype=int),
+                dist=dist
+            )
 
-                # print("Inserting", len(list(new_candidates)))
-                # print("Removing", len(list(old_candidates)))
-
-                for bundle in old_candidates:
-                    sstruct.remove(np.array(bundle))
-                for bundle in new_candidates:
-                    sstruct.insert(np.array(bundle))
-
-                # print("Size of struct:", len(sstruct))
-
-            t1_min, t1_max = t2_min, t2_max
+            # incremental data structure construction only
+            # if t1_min is None or t1_max is None:
+            #     candidates = self._bundles.irange_key(min_key=t2_min, 
+            #                                           max_key=t2_max)
+            #
+            #     for bundle in candidates:
+            #         sstruct.insert(np.array(bundle))
+            #
+            # else:
+            #     old_candidates = self._bundles.irange_key(min_key=t1_min,
+            #                                               max_key=min(t2_min,
+            #                                                           t1_max))
+            #     new_candidates = self._bundles.irange_key(min_key=max(t1_max,
+            #                                                           t2_min),
+            #                                               max_key=t2_max)
+            #
+            #     # print("Inserting", len(list(new_candidates)))
+            #     # print("Removing", len(list(old_candidates)))
+            #
+            #     for bundle in old_candidates:
+            #         sstruct.remove(np.array(bundle))
+            #     for bundle in new_candidates:
+            #         sstruct.insert(np.array(bundle))
+            #
+            #     # print("Size of struct:", len(sstruct))
+            #
+            # t1_min, t1_max = t2_min, t2_max
 
             if len(sstruct) > 0:
                 traj_np = np.array((*traj[row], 0.))

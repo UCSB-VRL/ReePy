@@ -23,6 +23,7 @@ def main():
     with pyinstrument.profile():
         for i, traj in enumerate(tqdm(data)):
             reeb.append_trajectory(traj)
+            print("bundle count: ", len(reeb._bundles))
 
     # report bundle statistics
     bundle_count = len(reeb._bundles)

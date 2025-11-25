@@ -4,9 +4,15 @@ import numpy as np
 from pyinstrument import profile
 
 class NaiveDS(SpatialDS):
-    def __init__(self, dist=lambda x, y: np.linalg.norm(x - y)):
+    def __init__(self, dist=lambda x, y: np.linalg.norm(x - y), 
+                 points=None,
+                 **kwargs):
         self.points = set()
         self.dist = dist
+
+        if points is not None:
+            for point in points:
+                self.insert(point)
 
     def insert(self, point):
         self.points.add(tuple(point))
