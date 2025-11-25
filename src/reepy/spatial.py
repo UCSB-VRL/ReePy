@@ -18,4 +18,8 @@ class SpatialDS:
     def nearest(self, point, k=1):
         raise NotImplementedError()
 
+    # returns the number of points in the structure
+    def __len__(self):
+        pass
+
 

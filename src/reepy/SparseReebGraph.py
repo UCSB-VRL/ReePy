@@ -7,7 +7,7 @@ from sortedcontainers import SortedList
 from .naive import NaiveDS
 
 def dist(x, y):
-    return np.linalg.norm(np.array(x[:-1]) - np.array(y[:-1]))
+    return np.linalg.norm(x[:-1] - y[:-1])
 
 class SparseReebGraph(ReebGraph):
     # TODO: better characterization of epsilon beyond spherical ball
@@ -56,6 +56,7 @@ class SparseReebGraph(ReebGraph):
 
                 for bundle in candidates:
                     sstruct.insert(np.array(bundle))
+
             else:
                 old_candidates = self._bundles.irange_key(min_key=t1_min,
                                                           max_key=min(t2_min,
@@ -63,16 +64,31 @@ class SparseReebGraph(ReebGraph):
                 new_candidates = self._bundles.irange_key(min_key=max(t1_max,
                                                                       t2_min),
                                                           max_key=t2_max)
+
+                # print("Inserting", len(list(new_candidates)))
+                # print("Removing", len(list(old_candidates)))
+
                 for bundle in old_candidates:
                     sstruct.remove(np.array(bundle))
                 for bundle in new_candidates:
-                    sstruct.add(np.array(bundle))
+                    sstruct.insert(np.array(bundle))
 
+                # print("Size of struct:", len(sstruct))
 
-            nearest_bundle = sstruct.nearest((*traj[row], 0))
+            t1_min, t1_max = t2_min, t2_max
 
-            if dist(nearest_bundle, (*traj[row], 0)) < self.epsilon:
-                self._bundle_indices[bundle[-1]].append(self.trajectory_count)
+            if len(sstruct) > 0:
+                traj_np = np.array((*traj[row], 0.))
+                nearest_bundle = sstruct.nearest(traj_np)
+                distance = dist(nearest_bundle, traj_np)
+            else:
+                distance = np.inf
+
+            if distance < self.epsilon:
+                # merge bundles
+                self._bundle_indices[int(nearest_bundle[-1])].append(self.trajectory_count)
+            else:
+                # add a new bundle
                 bundle_index = len(self._bundle_indices)
                 self._bundles.add((*traj[row], bundle_index))
                 self._bundle_indices[bundle_index] = [self.trajectory_count]

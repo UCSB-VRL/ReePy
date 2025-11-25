@@ -1,19 +1,36 @@
 from .spatial import SpatialDS
 import numpy as np
 
+from pyinstrument import profile
+
 class NaiveDS(SpatialDS):
     def __init__(self, dist=lambda x, y: np.linalg.norm(x - y)):
-        self.points = []
+        self.points = set()
         self.dist = dist
 
     def insert(self, point):
-        self.points.append(point)
+        self.points.add(tuple(point))
 
     def remove(self, point):
-        self.points.remove(point)
+        if tuple(point) in self.points:
+            self.points.remove(tuple(point))
 
     def nearest(self, point, k=1):
         if k > 1:
             raise ValueError("Unsupported K.")
-        index = np.argmin([self.dist(point, x) for x in self.points])
-        return index, self.points[index]
+
+        return np.array(next(iter(self.points)))
+
+        index, distance = -1, np.inf
+        nn = None
+
+        for i, candidate in enumerate(self.points):
+            if self.dist(np.array(candidate), point) < distance:
+                index = i
+                distance = self.dist(candidate, point)
+                nn = candidate
+
+        return np.array(candidate)
+
+    def __len__(self):
+        return len(self.points)
