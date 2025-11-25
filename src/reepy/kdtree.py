@@ -1,12 +1,13 @@
 from .spatial import SpatialDS
 from dataclasses import dataclass
 import numpy as np
+from typing import Optional
 
 @dataclass
 class Node:
     data: np.ndarray
-    left: Node
-    right: Node
+    left: Optional["Node"]
+    right: Optional["Node"]
     axis: int
 
 class KDTree(SpatialDS):
