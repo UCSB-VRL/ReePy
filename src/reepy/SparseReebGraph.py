@@ -51,8 +51,10 @@ class SparseReebGraph(ReebGraph):
             t2_min, t2_max = traj[row][0] - self.epsilon, traj[row][0] + self.epsilon
 
             # non-incremental construction approach
-            candidates = np.array(list(self._bundles.irange_key(min_key=t2_min,
-                                                                max_key=t2_max)))
+            # candidates = np.array(list(self._bundles.irange_key(min_key=t2_min,
+            #                                                     max_key=t2_max)))
+
+            candidates = np.array(list(self._bundles))
 
             if len(candidates.shape) != 2:
                 candidates = candidates.reshape(-1, 1)
@@ -117,10 +119,12 @@ class SparseReebGraph(ReebGraph):
             # remove the trajectory dimension
             self.append_trajectory(traj[:, 1:])
 
-        self.build
+        self.build()
 
     # once trajectories are added, compute the reeb graph
     def build(self):
+        self.clear()
+
         states = [None] * self.trajectory_count
         state_nodes = [None] * self.trajectory_count
 

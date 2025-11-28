@@ -12,7 +12,7 @@ from tqdm import tqdm
 # @profile
 def main():
     # set up the data
-    N = 60 * 60 * 24 // 10 # 10 second sampling frequency
+    N = 60 * 60 * 24 // 10 // 6 # 10 second sampling frequency
     K = 33 # 33 trajectories
 
     # test incremental construction
