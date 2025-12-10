@@ -38,6 +38,9 @@ class SequentialReebGraph(ReebGraph):
             self.L = L
             self.D = D
 
+            print("L", L)
+            print("D", D)
+
             # initialize the bundle data structures
             self.bundles = [
                 index.Index() for _ in range(L)
@@ -98,9 +101,10 @@ class SequentialReebGraph(ReebGraph):
         nodec = 0
         for bundle in bindex.intersection(bindex.bounds, objects=True):
             centroid = bundle.bbox[:self.D]
+            time = 0
             trajs = self.bundle_dict[bundle.id]
 
-            self.add_node(nodec, centroid=centroid, trajs=tuple(trajs))
+            self.add_node(nodec, centroid=centroid, time=time, trajs=tuple(trajs))
 
             active[nodec] = tuple(trajs)
 
@@ -110,7 +114,9 @@ class SequentialReebGraph(ReebGraph):
 
             nodec += 1
 
-        for bindex in self.bundles[1:-1]:
+        for rtime, bindex in enumerate(self.bundles[1:-1]):
+            # rtime is relative to the loop => time = rtime + 1
+            time = rtime + 1
             new_edges = []
             inactive_nodes = set()
 
@@ -122,7 +128,7 @@ class SequentialReebGraph(ReebGraph):
                 prev_cc = active[states[curr_cc[0]]]
 
                 if curr_cc != prev_cc:
-                    self.add_node(nodec, centroid=centroid, trajs=curr_cc)
+                    self.add_node(nodec, centroid=centroid, time=time, trajs=curr_cc)
                     active[nodec] = curr_cc
 
                     # replace active nodes
@@ -154,19 +160,21 @@ class SequentialReebGraph(ReebGraph):
 
         # add a node for a disappear event
         bindex = self.bundles[-1]
+        time = len(self.bundles) - 1
         new_edges = []
         for bundle in bindex.intersection(bindex.bounds, objects=True):
             centroid = bundle.bbox[:self.D]
             curr_cc = tuple(self.bundle_dict[bundle.id])
 
             # always add a disappear node
-            self.add_node(nodec, centroid=centroid, trajs=curr_cc)
-            nodec += 1
+            self.add_node(nodec, centroid=centroid, time=time, trajs=curr_cc)
 
             # compute edge to previous node
             new_edges += [
                 (states[traj], nodec) for traj in curr_cc
             ]
+
+            nodec += 1
 
         edges = Counter(new_edges)
         for edge, count in edges.items():
