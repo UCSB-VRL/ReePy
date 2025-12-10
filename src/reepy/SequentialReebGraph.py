@@ -38,9 +38,6 @@ class SequentialReebGraph(ReebGraph):
             self.L = L
             self.D = D
 
-            print("L", L)
-            print("D", D)
-
             # initialize the bundle data structures
             self.bundles = [
                 index.Index() for _ in range(L)
@@ -180,6 +177,4 @@ class SequentialReebGraph(ReebGraph):
         for edge, count in edges.items():
             weight = count / len(active[edge[0]])
             self.add_edge(edge[0], edge[1], weight=weight)
-
-        print(nodec)
 
