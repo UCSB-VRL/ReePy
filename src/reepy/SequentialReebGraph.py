@@ -1,136 +1,177 @@
-from .ReebGraph import ReebGraph
-from .clustering import NaiveClusterer
-import pandas as pd
+from .ReebGraph  import ReebGraph
 import numpy as np
 
+from rtree import index
+from collections import Counter
+
+
 class SequentialReebGraph(ReebGraph):
-    def __init__(self, clusterer=None, epsilon=1e-5, dist=None, store_trajectories=False):
+    def __init__(self, epsilon=1e-5, store_trajectories=False, dist=None):
         super().__init__()
 
-        # Set up the clusterer object
-        if clusterer is None:
-            clusterer = NaiveClusterer
-        self.Clusterer = clusterer
+        if dist is not None:
+            raise ValueError("Custom Distance Functions are not yet supported.")
+        else:
+            self.dist = lambda x, y: np.linalg.norm(x - y)
 
         self.epsilon = epsilon
-        self.dist = dist
 
         # bundles stores centroids and clusters
         self.bundles = None
-        # number of trajectories 
-        self.trajc = 0
-        # sequence length
-        self.seq_len = None
+        self.bundle_dict = {}
 
+        # number of trajectories
+        self.trajc = 0
+
+        # length of each sequence
+        self.L = None
+        # dimension of each point
+        self.D = None
+
+        # store original trajectories within Reeb Graph
         self.store = store_trajectories
         self.trajectories = []
 
-    
-    def append_trajectory(self, traj: pd.DataFrame):
-        if self.store:
-            if self.trajectories is None:
-                self.trajectories = [traj]
-            else:
-                self.trajectories.append(traj)
+    def append_trajectory(self, traj: np.ndarray):
+        if self.L is None:
+            (L, D) = traj.shape
+            self.L = L
+            self.D = D
 
-        if self.seq_len is None:
-            self.seq_len = traj.shape[0]
-
-            # there will be one bundle at each timestep 
+            # initialize the bundle data structures
             self.bundles = [
-                {"clusters": [], "centroids": []} for _ in range(self.seq_len)
+                index.Index() for _ in range(L)
             ]
-        
-        # inject the seq_index into the trajectory (note - this is equivalent to index)
-        # this will be used to create unique nodes
-        traj["seq_index"] = np.arange(self.seq_len)
-        
-        for i in range(self.seq_len):
-            point = traj.iloc[i]
-            
-            min_dist = np.inf
-            min_index = -1
 
-            # find the closest centroid to the current point
-            for j, centroid in enumerate(self.bundles[i]["centroids"]):
-                d = self.dist(point, centroid)
-                if d < self.epsilon and d < min_dist:
-                    min_dist = d
-                    min_index = j
-                    # by construction, there should only be one such j
-            
-            if min_index == -1:
-                # create a new centroid
-                self.bundles[i]["centroids"].append(point)
-                self.bundles[i]["clusters"].append([self.trajc])
+        assert traj.shape == (self.L, self.D), "All trajectories must be same shape"
+
+        # compute bundle counts
+        for i, point in enumerate(traj):
+            bbox = tuple(point) + tuple(point)
+            nn = list(self.bundles[i].nearest(bbox, 1, objects=True))
+
+            if len(nn) == 1:
+                nn_point = nn[0].bbox[:self.D]
+                if self.dist(nn_point, point) > self.epsilon:
+                    # create a new bundle
+                    self.bundles[i].insert(
+                        len(self.bundle_dict),
+                        bbox
+                    )
+                    self.bundle_dict[len(self.bundle_dict)] = [self.trajc]
+                else:
+                    # add to existing bundle
+                    self.bundle_dict[nn[0].id].append(self.trajc)
             else:
-                self.bundles[i]["clusters"][min_index].append(self.trajc)
+                # always create a new bundle
+                self.bundles[i].insert(
+                    len(self.bundle_dict),
+                    bbox
+                )
+                self.bundle_dict[len(self.bundle_dict)] = [self.trajc]
+
+
+        if self.store:
+            self.trajectories.append(traj)
 
         self.trajc += 1
-    
+
     def append_trajectories(self, trajs):
         for traj in trajs:
             self.append_trajectory(traj)
-    
+        self.build()
+
     def build(self):
-        centroids = self.bundles[0]["centroids"]
-        clusters = self.bundles[0]["clusters"]
-        state = np.zeros((self.trajc,), dtype=int) - 1
-
-        for i, centroid in enumerate(centroids):
-            node = tuple(centroid)
-            self.add_node(node)
-            for traj in self.bundles[0]["clusters"][i]:
-                state[traj] = i
+        # clear existing nodes and edges -- allows us to call this repeatedly to
+        # plot node count over time
+        self.clear()
         
-        edge_dict = None
+        # assert at least one bundle exists
+        assert self.trajc >= 1
 
-        for t in range(1, self.seq_len):
-            new_centroids = self.bundles[t]["centroids"]
-            new_clusters = self.bundles[t]["clusters"]
-            new_state = np.zeros((self.trajc,), dtype=int) - 1
+        # initialize the state vector
+        states = [None for _ in range(self.trajc)]
+        active = {}
 
-            edge_dict = {}
+        bindex = self.bundles[0] 
 
-            for i, centroid in enumerate(new_centroids):
-                for traj in new_clusters[i]:
-                    new_state[traj] = i
-            
-            visited_vector = np.zeros_like(new_state, dtype=bool)
+        nodec = 0
+        for bundle in bindex.intersection(bindex.bounds, objects=True):
+            centroid = bundle.bbox[:self.D]
+            trajs = self.bundle_dict[bundle.id]
 
-            for traj_i in range(self.trajc):
-                if visited_vector[traj_i]:
-                    # this trajectory has already been processed
-                    continue
-                
-                # compare states
-                pc = clusters[state[traj_i]]
-                cc = new_clusters[new_state[traj_i]]
+            self.add_node(nodec, centroid=centroid, trajs=tuple(trajs))
 
-                if pc != cc or t == self.seq_len - 1:
-                    # make cc a new node
-                    node = tuple(new_centroids[new_state[traj_i]])
-                    self.add_node(node)
+            active[nodec] = tuple(trajs)
 
-                    for traj in cc:
-                        src = tuple(centroids[state[traj]])
-                        srcsize = len(clusters[state[traj]])
-                        dst = tuple(new_centroids[new_state[traj]])
+            # state of each trajectory
+            for traj in trajs:
+                states[traj] = nodec
 
-                        if (src, dst) not in edge_dict:
-                            edge_dict[(src, dst)] = 1./srcsize
-                        else:
-                            edge_dict[(src, dst)] += 1./srcsize
-                        visited_vector[traj] = True
-                else:
-                    new_centroids[new_state[traj_i]] = centroids[state[traj_i]]
-                    for traj in cc:
-                        visited_vector[traj] = True
-                
-            # flush the edge dict
-            for (src, dst), weight in edge_dict.items():
-                self.add_edge(src, dst, weight=weight)
-            
-            clusters = new_clusters
-            centroids = new_centroids
-            state = new_state
+            nodec += 1
+
+        for bindex in self.bundles[1:-1]:
+            new_edges = []
+            inactive_nodes = set()
+
+            for bundle in bindex.intersection(bindex.bounds, objects=True):
+                centroid = bundle.bbox[:self.D]
+                curr_cc = tuple(self.bundle_dict[bundle.id])
+
+                # check if there was a change in the connected components
+                prev_cc = active[states[curr_cc[0]]]
+
+                if curr_cc != prev_cc:
+                    self.add_node(nodec, centroid=centroid, trajs=curr_cc)
+                    active[nodec] = curr_cc
+
+                    # replace active nodes
+                    inactive_nodes |= {
+                        states[traj] for traj in curr_cc
+                    }
+
+                    new_edges += [
+                        (states[traj], nodec) for traj in curr_cc
+                    ]
+
+                    # update state -- we will never get this again since each
+                    # trajectory belongs to exactly one bundle, so it won't
+                    # appear in curr_cc during this iteration
+                    for traj in curr_cc:
+                        states[traj] = nodec
+
+                    nodec += 1
+
+            # update edges
+            edges = Counter(new_edges)
+            for edge, count in edges.items():
+                weight = count / len(active[edge[0]])
+                self.add_edge(edge[0], edge[1], weight=weight)
+
+            # evict inactive nodes
+            for node in inactive_nodes:
+                active.pop(node)
+
+        # add a node for a disappear event
+        bindex = self.bundles[-1]
+        new_edges = []
+        for bundle in bindex.intersection(bindex.bounds, objects=True):
+            centroid = bundle.bbox[:self.D]
+            curr_cc = tuple(self.bundle_dict[bundle.id])
+
+            # always add a disappear node
+            self.add_node(nodec, centroid=centroid, trajs=curr_cc)
+            nodec += 1
+
+            # compute edge to previous node
+            new_edges += [
+                (states[traj], nodec) for traj in curr_cc
+            ]
+
+        edges = Counter(new_edges)
+        for edge, count in edges.items():
+            weight = count / len(active[edge[0]])
+            self.add_edge(edge[0], edge[1], weight=weight)
+
+        print(nodec)
+

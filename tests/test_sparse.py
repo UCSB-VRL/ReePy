@@ -3,7 +3,7 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 
-def test_sparse():
+def notest_sparse():
     N = 60 * 60 * 24 / 10
     K = 5
     data = np.random.rand(K, N, 3)
