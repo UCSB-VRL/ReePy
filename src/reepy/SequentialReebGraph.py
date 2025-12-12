@@ -178,3 +178,15 @@ class SequentialReebGraph(ReebGraph):
             weight = count / len(active[edge[0]])
             self.add_edge(edge[0], edge[1], weight=weight)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # remove problematic lambda functions
+        if "dist" in state:
+            del state["dist"]
+        state["dist"] = True
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        if self.__dict__.get("dist", False):
+            self.dist = lambda x, y: np.linalg.norm(x - y)
