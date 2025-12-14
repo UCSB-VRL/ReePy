@@ -6,13 +6,16 @@ from collections import Counter
 
 
 class SequentialReebGraph(ReebGraph):
+    def __finite_euclidean__(x, y):
+        return 0 if np.isinf(x).any() and np.isinf(y).any() else np.linalg.norm(x - y)
+
     def __init__(self, epsilon=1e-5, store_trajectories=False, dist=None):
         super().__init__()
 
         if dist is not None:
             raise ValueError("Custom Distance Functions are not yet supported.")
         else:
-            self.dist = lambda x, y: np.linalg.norm(x - y)
+            self.dist = SequentialReebGraph.__finite_euclidean__
 
         self.epsilon = epsilon
 
@@ -189,4 +192,4 @@ class SequentialReebGraph(ReebGraph):
     def __setstate__(self, state):
         self.__dict__.update(state)
         if self.__dict__.get("dist", False):
-            self.dist = lambda x, y: np.linalg.norm(x - y)
+            self.dist = SequentialReebGraph.__finite_euclidean__
