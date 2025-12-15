@@ -1,8 +1,10 @@
-from .ReebGraph  import ReebGraph
+from .ReebGraph import ReebGraph
 import numpy as np
 
 from rtree import index
 from collections import Counter
+from types import SimpleNamespace
+from itertools import chain
 
 
 class SequentialReebGraph(ReebGraph):
@@ -42,37 +44,45 @@ class SequentialReebGraph(ReebGraph):
             self.D = D
 
             # initialize the bundle data structures
-            self.bundles = [
-                index.Index() for _ in range(L)
-            ]
+            self.bundles = [index.Index() for _ in range(L)]
+
+            # index of bundle at infinity
+            self.invalid_samples = [[] for _ in range(L)]
 
         assert traj.shape == (self.L, self.D), "All trajectories must be same shape"
 
         # compute bundle counts
         for i, point in enumerate(traj):
+            if not np.isfinite(point).all():
+                if len(self.invalid_samples[i]) == 0:
+                    # create a bundle at infinity
+                    self.invalid_samples[i].append(SimpleNamespace(
+                        bbox=[np.inf] * self.D, 
+                        id=len(self.bundle_dict)
+                    ))
+                    self.bundle_dict[len(self.bundle_dict)] = [self.trajc]
+                else:
+                    # add to existing bundle at infinity
+                    self.bundle_dict[self.invalid_samples[i][0].id].append(self.trajc)
+                continue
+
             bbox = tuple(point) + tuple(point)
+
             nn = list(self.bundles[i].nearest(bbox, 1, objects=True))
 
             if len(nn) == 1:
-                nn_point = nn[0].bbox[:self.D]
+                nn_point = nn[0].bbox[: self.D]
                 if self.dist(nn_point, point) > self.epsilon:
                     # create a new bundle
-                    self.bundles[i].insert(
-                        len(self.bundle_dict),
-                        bbox
-                    )
+                    self.bundles[i].insert(len(self.bundle_dict), bbox)
                     self.bundle_dict[len(self.bundle_dict)] = [self.trajc]
                 else:
                     # add to existing bundle
                     self.bundle_dict[nn[0].id].append(self.trajc)
             else:
                 # always create a new bundle
-                self.bundles[i].insert(
-                    len(self.bundle_dict),
-                    bbox
-                )
+                self.bundles[i].insert(len(self.bundle_dict), bbox)
                 self.bundle_dict[len(self.bundle_dict)] = [self.trajc]
-
 
         if self.store:
             self.trajectories.append(traj)
@@ -88,7 +98,7 @@ class SequentialReebGraph(ReebGraph):
         # clear existing nodes and edges -- allows us to call this repeatedly to
         # plot node count over time
         self.clear()
-        
+
         # assert at least one bundle exists
         assert self.trajc >= 1
 
@@ -96,11 +106,14 @@ class SequentialReebGraph(ReebGraph):
         states = [None for _ in range(self.trajc)]
         active = {}
 
-        bindex = self.bundles[0] 
+        bindex = self.bundles[0]
 
         nodec = 0
-        for bundle in bindex.intersection(bindex.bounds, objects=True):
-            centroid = bundle.bbox[:self.D]
+        for bundle in chain(
+            bindex.intersection(bindex.bounds, objects=True),
+            self.invalid_samples[0]
+        ):
+            centroid = bundle.bbox[: self.D]
             time = 0
             trajs = self.bundle_dict[bundle.id]
 
@@ -120,8 +133,11 @@ class SequentialReebGraph(ReebGraph):
             new_edges = []
             inactive_nodes = set()
 
-            for bundle in bindex.intersection(bindex.bounds, objects=True):
-                centroid = bundle.bbox[:self.D]
+            for bundle in chain(
+                bindex.intersection(bindex.bounds, objects=True),
+                self.invalid_samples[time]
+            ):
+                centroid = bundle.bbox[: self.D]
                 curr_cc = tuple(self.bundle_dict[bundle.id])
 
                 # check if there was a change in the connected components
@@ -132,13 +148,9 @@ class SequentialReebGraph(ReebGraph):
                     active[nodec] = curr_cc
 
                     # replace active nodes
-                    inactive_nodes |= {
-                        states[traj] for traj in curr_cc
-                    }
+                    inactive_nodes |= {states[traj] for traj in curr_cc}
 
-                    new_edges += [
-                        (states[traj], nodec) for traj in curr_cc
-                    ]
+                    new_edges += [(states[traj], nodec) for traj in curr_cc]
 
                     # update state -- we will never get this again since each
                     # trajectory belongs to exactly one bundle, so it won't
@@ -162,17 +174,18 @@ class SequentialReebGraph(ReebGraph):
         bindex = self.bundles[-1]
         time = len(self.bundles) - 1
         new_edges = []
-        for bundle in bindex.intersection(bindex.bounds, objects=True):
-            centroid = bundle.bbox[:self.D]
+        for bundle in chain(
+            bindex.intersection(bindex.bounds, objects=True),
+            self.invalid_samples[-1]
+        ):
+            centroid = bundle.bbox[: self.D]
             curr_cc = tuple(self.bundle_dict[bundle.id])
 
             # always add a disappear node
             self.add_node(nodec, centroid=centroid, time=time, trajs=curr_cc)
 
             # compute edge to previous node
-            new_edges += [
-                (states[traj], nodec) for traj in curr_cc
-            ]
+            new_edges += [(states[traj], nodec) for traj in curr_cc]
 
             nodec += 1
 

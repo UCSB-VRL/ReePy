@@ -20,6 +20,30 @@ def test_random():
         dst_trajs = set(reeb.nodes[v]['trajs'])
         assert not src_trajs.isdisjoint(dst_trajs), f"No intersection between {u} and {v}"
 
+def test_dropout_errors():
+    # 33 days with a 10 second SR for 2D points
+    data = np.random.rand(100, 100, 2)
+
+    p = 0.1
+    mask = np.random.rand(100, 100) < p
+    data[mask] = np.inf
+
+    reeb = reepy.SequentialReebGraph(epsilon=0.1)
+    reeb.append_trajectories(data)
+
+    # verify that sum of outbound edges of a node is (near) 1
+    for n, w in reeb.out_degree(weight="weight"):
+        if reeb.out_degree(n) > 0:             # has outgoing edges
+            assert np.isclose(w, 1.0, rtol=1e-6, atol=1e-9), f"Node {n} sum={w}"
+
+    # verify that each of the edges has some intersection (otherwise it would
+    # have a weight of zero)
+    for u, v in reeb.edges():
+        src_trajs = set(reeb.nodes[u]['trajs'])
+        dst_trajs = set(reeb.nodes[v]['trajs'])
+        assert not src_trajs.isdisjoint(dst_trajs), f"No intersection between {u} and {v}"
+
+
 def test_1d_sequence_disconnect():
     data = np.array([
         [[3, 3, 3, 3, 3, 3, 3, 3]],
