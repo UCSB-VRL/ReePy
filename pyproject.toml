@@ -1,7 +1,7 @@
 [project]
 name = "reepy"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.1.1"
+description = ""
 readme = "README.md"
 authors = [
     { name = "Anantajit Subrahmanya", email = "anantajit@ucsb.edu" }
@@ -12,6 +12,7 @@ dependencies = [
     "networkx>=3.4.2",
     "numpy>=2.2.6",
     "pandas>=2.3.0",
+    "rtree>=1.4.1",
     "sortedcontainers>=2.4.0",
 ]
 
