@@ -5,6 +5,7 @@ from rtree import index
 from collections import Counter
 from types import SimpleNamespace
 from itertools import chain
+from warnings import warn
 
 
 class SequentialReebGraph(ReebGraph):
@@ -106,15 +107,23 @@ class SequentialReebGraph(ReebGraph):
         states = [None for _ in range(self.trajc)]
         active = {}
 
-        bindex = self.bundles[0]
-
+        t = 0
+        bindex = self.bundles[t]
         nodec = 0
+
+        if len(bindex) == 0:
+            # iterate forwards until we find a non-zero sample
+            for bundle_index in self.bundles:
+                if len(bundle_index) != 0:
+                    bindex = bundle_index
+                    break
+
         for bundle in chain(
             bindex.intersection(bindex.bounds, objects=True),
-            self.invalid_samples[0]
+            self.invalid_samples[t]
         ):
-            centroid = bundle.bbox[: self.D]
-            time = 0
+            centroid = bundle.bbox[:self.D]
+            time = t
             trajs = self.bundle_dict[bundle.id]
 
             self.add_node(nodec, centroid=centroid, time=time, trajs=tuple(trajs))
@@ -127,7 +136,7 @@ class SequentialReebGraph(ReebGraph):
 
             nodec += 1
 
-        for rtime, bindex in enumerate(self.bundles[1:-1]):
+        for rtime, bindex in enumerate(self.bundles[t + 1:-1]):
             # rtime is relative to the loop => time = rtime + 1
             time = rtime + 1
             new_edges = []
@@ -178,6 +187,12 @@ class SequentialReebGraph(ReebGraph):
         bindex = self.bundles[-1]
         time = len(self.bundles) - 1
         new_edges = []
+
+        if len(bindex) == 0:
+            # no bundles present at this sample index
+            warn(f"No bundles at index {len(self.bundles)}")
+            return
+
         for bundle in chain(
             bindex.intersection(bindex.bounds, objects=True),
             self.invalid_samples[-1]
