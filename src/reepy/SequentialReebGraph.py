@@ -135,10 +135,6 @@ class SequentialReebGraph(ReebGraph):
 
             if len(bindex) == 0:
                 # no bundles present at this sample index
-                print("Time:", time)
-                print("Bindex:", bindex)
-
-                print(f"[WARN] No bundles present at timestep {time}")
                 continue
 
             for bundle in chain(
