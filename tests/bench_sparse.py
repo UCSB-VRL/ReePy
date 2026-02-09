@@ -4,17 +4,18 @@ import numpy as np
 import pyinstrument
 # from memory_profiler import profile
 
+
 # @profile
 def main():
     # set up the data
-    N = 60 * 60 * 24 // 10 # 10 second sampling frequency
-    K = 33 # 33 trajectories
+    N = 60 * 60 * 24 // 10  # 10 second sampling frequency
+    K = 33  # 33 trajectories
 
     # test incremental construction
-    data = np.random.rand(K, N, 3) # 2D samples between 0 and 1
-    data[:, :, 0] = np.arange(N)/(60 * 60) # time in hours
+    data = np.random.rand(K, N, 3)  # 2D samples between 0 and 1
+    data[:, :, 0] = np.arange(N) / (60 * 60)  # time in hours
 
-    reeb = reepy.SparseReebGraph(dim=2, epsilon=0.25) # ~15 minutes
+    reeb = reepy.SparseReebGraph(dim=2, epsilon=0.25)  # ~15 minutes
     with pyinstrument.profile():
         for i, traj in enumerate(data):
             reeb.append_trajectory(traj)
@@ -42,6 +43,7 @@ def main():
     reeb = reepy.SparseReebGraph(dim=2, epsilon=0.25)
     with pyinstrument.profile():
         reeb.append_trajectories(data)
+
 
 if __name__ == "__main__":
     main()

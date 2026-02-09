@@ -101,9 +101,12 @@ class ReebGraph(DiGraph):
 
                 if curr_ids != prev_ids:
                     # create a new node
-                    self.add_node(nodec, level=level, 
-                                  point=bundle.point,
-                                  trajs=bundle.trajectory_ids)
+                    self.add_node(
+                        nodec,
+                        level=level,
+                        point=bundle.point,
+                        trajs=bundle.trajectory_ids,
+                    )
                     node_bundles[nodec] = bundle
 
                     predecessor_counts = {}

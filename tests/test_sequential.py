@@ -1,6 +1,7 @@
 import reepy
 import numpy as np
 
+
 def test_random():
     # 33 days with a 10 second SR for 2D points
     data = np.random.rand(100, 100, 2)
