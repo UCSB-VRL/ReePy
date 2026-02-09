@@ -57,10 +57,11 @@ class SequentialReebGraph(ReebGraph):
             if not np.isfinite(point).all():
                 if len(self.invalid_samples[i]) == 0:
                     # create a bundle at infinity
-                    self.invalid_samples[i].append(SimpleNamespace(
-                        bbox=[np.inf] * self.D, 
-                        id=len(self.bundle_dict)
-                    ))
+                    self.invalid_samples[i].append(
+                        SimpleNamespace(
+                            bbox=[np.inf] * self.D, id=len(self.bundle_dict)
+                        )
+                    )
                     self.bundle_dict[len(self.bundle_dict)] = [self.trajc]
                 else:
                     # add to existing bundle at infinity
@@ -119,10 +120,9 @@ class SequentialReebGraph(ReebGraph):
                     break
 
         for bundle in chain(
-            bindex.intersection(bindex.bounds, objects=True),
-            self.invalid_samples[t]
+            bindex.intersection(bindex.bounds, objects=True), self.invalid_samples[t]
         ):
-            centroid = bundle.bbox[:self.D]
+            centroid = bundle.bbox[: self.D]
             time = t
             trajs = self.bundle_dict[bundle.id]
 
@@ -136,7 +136,7 @@ class SequentialReebGraph(ReebGraph):
 
             nodec += 1
 
-        for rtime, bindex in enumerate(self.bundles[t + 1:-1]):
+        for rtime, bindex in enumerate(self.bundles[t + 1 : -1]):
             # rtime is relative to the loop => time = rtime + 1
             time = rtime + 1
             new_edges = []
@@ -148,7 +148,7 @@ class SequentialReebGraph(ReebGraph):
 
             for bundle in chain(
                 bindex.intersection(bindex.bounds, objects=True),
-                self.invalid_samples[time]
+                self.invalid_samples[time],
             ):
                 centroid = bundle.bbox[: self.D]
                 curr_cc = tuple(self.bundle_dict[bundle.id])
@@ -194,8 +194,7 @@ class SequentialReebGraph(ReebGraph):
             return
 
         for bundle in chain(
-            bindex.intersection(bindex.bounds, objects=True),
-            self.invalid_samples[-1]
+            bindex.intersection(bindex.bounds, objects=True), self.invalid_samples[-1]
         ):
             centroid = bundle.bbox[: self.D]
             curr_cc = tuple(self.bundle_dict[bundle.id])

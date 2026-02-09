@@ -1,6 +1,7 @@
 import heapq
 import numpy as np
 
+
 class KDArray:
     def __init__(self, points, dist=None):
         self.points = points
@@ -14,11 +15,12 @@ class KDArray:
         points = []
 
         for i, point in enumerate(self.points):
-            if self.dist(center, point) <= radius ** 2:
+            if self.dist(center, point) <= radius**2:
                 indices.append(i)
                 points.append(point)
-        
+
         return indices, points
+
 
 # note: this clusterer is extremely slow and will not lead to optimal cluster formation
 #       points should be a pandas dataframe of features
@@ -30,7 +32,7 @@ class NaiveClusterer:
         if dist is None:
             dist = lambda a, b: np.sqrt(sum((a[i] - b[i]) ** 2) for i in range(len(a)))
         self.dist = dist
-    
+
     def cluster(self):
         # returns a list of clusters (indices) and centroids
         unclustered = set(range(len(self.points)))
@@ -47,7 +49,7 @@ class NaiveClusterer:
                 if self.dist(centroid, self.points.iloc[i]) <= self.epsilon:
                     cluster.append(i)
                     unclustered.remove(i)
-            
+
             clusters.append(cluster)
             centroids.append(centroid)
         return clusters, centroids
@@ -69,9 +71,9 @@ class NaiveClusterer:
                     new_clusters[i].append(index)
                     found = True
                     break
-            
+
             if not found:
                 new_clusters.append([index])
                 new_centroids.append(point)
-        
+
         return new_clusters, new_centroids
