@@ -1,5 +1,6 @@
-from networkx import DiGraph
 from typing import Iterable
+
+from networkx import DiGraph
 
 
 class _Bundle:
@@ -86,6 +87,7 @@ class ReebGraph(DiGraph):
         nodec = 0
 
         # iterate bundles in sorted level order
+        disappear_level = max(self.bundles.keys())
         for level in sorted(self.bundles.keys()):
             for bundle in self.bundles[level]:
                 curr_ids = bundle.trajectory_ids
@@ -99,7 +101,7 @@ class ReebGraph(DiGraph):
                     else None
                 )
 
-                if curr_ids != prev_ids:
+                if curr_ids != prev_ids or level == disappear_level:
                     # create a new node
                     self.add_node(
                         nodec,
