@@ -70,7 +70,7 @@ class ReebGraph(DiGraph):
         if build:
             self.__build()
 
-    def append_trajectories(self, trajs: Iterable):
+    def append_trajectories(self, trajs):
         for traj in trajs:
             self.append_trajectory(traj, build=False)
         self.__build()
