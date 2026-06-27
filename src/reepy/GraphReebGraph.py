@@ -49,7 +49,9 @@ class GraphReebGraph(ReebGraph):
             for node in nodes:
                 placed = False
                 for group in groups:
-                    if self.equivalence(group[0], node):
+                    if self.orderer(group[0]) == self.orderer(
+                        node
+                    ) and self.equivalence(group[0], node):
                         group.append(node)
                         placed = True
                         break
@@ -63,9 +65,13 @@ class GraphReebGraph(ReebGraph):
             supernode_count += 1
             members = tuple(nodes)
             rep = members[0]
-            self.add_node(
-                sid, members=members, representative=rep, level=self.orderer(rep)
+            rep_attrs = dict(source_graph.nodes[rep])
+            rep_attrs.update(
+                members=members,
+                representative=rep,
+                level=self.orderer(rep),
             )
+            self.add_node(sid, **rep_attrs)
             for node in members:
                 visited.add(node)
                 node_to_super[node] = sid
@@ -105,6 +111,57 @@ class GraphReebGraph(ReebGraph):
         remaining = [n for n in source_graph.nodes if n not in visited]
         for group in group_equivalent(remaining):
             create_supernode(group)
+
+        # Reeb Graph pass
+        def add_or_merge_edge(u: int, v: int, attrs: dict[str, Any]) -> None:
+            if u == v:
+                return
+            if self.has_edge(u, v):
+                if "weight" in attrs:
+                    self[u][v]["weight"] = (
+                        self[u][v].get("weight", 1.0) + attrs["weight"]
+                    )
+                return
+            self.add_edge(u, v, **attrs)
+
+        active: list[int] = [n for n in self.nodes if self.in_degree(n) == 0]
+        for sid in list(nx.topological_sort(self)):
+            if sid not in self:
+                continue
+
+            succs = list(self.successors(sid))
+            preds = list(self.predecessors(sid))
+            is_sink = not succs
+            rep = self.nodes[sid]["representative"]
+
+            equivalent_active = None
+            for a in active:
+                if (
+                    a != sid
+                    and a in self
+                    and self.equivalence(self.nodes[a]["representative"], rep)
+                ):
+                    equivalent_active = a
+                    break
+
+            if equivalent_active is not None and not is_sink:
+                for child in succs:
+                    add_or_merge_edge(
+                        equivalent_active,
+                        child,
+                        dict(self.get_edge_data(sid, child) or {}),
+                    )
+                if sid in active:
+                    active.remove(sid)
+                self.remove_node(sid)
+                continue
+
+            for p in preds:
+                if p in active:
+                    active.remove(p)
+                    break
+            if sid not in active:
+                active.append(sid)
 
         # TODO: correctly define the trajectory count
         # self._trajectory_count += 1
